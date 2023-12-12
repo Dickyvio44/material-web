@@ -216,29 +216,44 @@ export function mixinFormAssociated<
       return this[internals].labels;
     }
 
-    // name attribute must be set synchronously
-    @property({reflect: true})
+    // Use @property only to add `name` and `disabled` attributes to the
+    // `observedAttributes` array. They must set their attributes synchronously
+    // to work with synchronous form APIs, and Lit's attribute reflection is
+    // async.
+
+    @property({noAccessor: true})
     get name() {
       return this.getAttribute('name') ?? '';
     }
     set name(name: string) {
-      const prev = this.name;
-      // Setting name to null or empty string does not remove the attribute.
+      // Note: setting name to null or empty does not remove the attribute.
       this.setAttribute('name', name);
-      // Explicit requestUpdate needed for Lit 2.0
-      this.requestUpdate('name', prev);
+      // `requestUpdate()` is called in `attributeChangedCallback()`
     }
 
-    // disabled attribute must be set synchronously
-    @property({type: Boolean, reflect: true})
+    @property({type: Boolean, noAccessor: true})
     get disabled() {
       return this.hasAttribute('disabled');
     }
     set disabled(disabled: boolean) {
-      const prev = this.disabled;
       this.toggleAttribute('disabled', disabled);
-      // Explicit requestUpdate needed for Lit 2.0
-      this.requestUpdate('disabled', prev);
+      // `requestUpdate()` is called in `attributeChangedCallback()`
+    }
+
+    override attributeChangedCallback(
+      name: string,
+      old: string | null,
+      value: string | null,
+    ) {
+      if (name === 'name' || name === 'disabled') {
+        // Disabled's value is only false if the attribute is missing and null.
+        const oldValue = name === 'disabled' ? old !== null : old;
+        // Trigger a lit update when the attribute changes.
+        this.requestUpdate(name, oldValue);
+        return;
+      }
+
+      super.attributeChangedCallback(name, old, value);
     }
 
     override requestUpdate(
